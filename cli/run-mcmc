@@ -1,4 +1,4 @@
-#!/usr/env python
+#!/usr/bin/env python
 
 import os
 import sys
@@ -13,6 +13,7 @@ import pickle
 
 import iodata
 import models
+import params
 from mcmc import MCMC
 
 
@@ -29,14 +30,14 @@ parser.add_argument('-m', '--model', type=str,
 parser.add_argument('-t', '--title', type=str, default='', 
                     help='The description of the mcmc experiment. This is going to be \
                           the name of directory to be saved.')
-parser.add_argument('-p', '--path', type=str, default='../data/20apr-21may.csv', 
+parser.add_argument('-p', '--path', type=str, default='../data/20apr_21may.csv', 
                     help='The path to the data. This path is going to be the argument \
                           for io.load_data().')
 parser.add_argument('-o', '--outputdir', type=str, default='../results', 
                     help='The path to the directory where results are saved.')
 parser.add_argument('-pf', '--prefecture', type=str, default='Tokyo', 
                     help='The prefecture for which modeling is going to be conducted.')
-parser.add_argument('-m', '--metrics', type=str, default='PositiveRate', 
+parser.add_argument('-ms', '--metrics', type=str, default='positiveRate', 
                     help='The metrics for which modeling is going to be conducted.')
 parser.add_argument('-fd', '--first-day', type=int, default=0, 
                     help='The first day from which modeling is going to be conducted.')
@@ -52,16 +53,16 @@ parser.add_argument('-pp', '--population-path', type=str, default='../data/popul
                     help='The path to the population data for each prefecture.')
 
 
-# Pull the arguments. 
+# Pull the arguments
 args = parser.parse_args()
 
 # Read data
-data = iodata.load_data(args.path, args.prefecture, args.metrics, (args.first-day, args.last-day))
-population = iodata.load_population(args.population-path, args.prefecture)
+data = iodata.load_data(args.path, args.prefecture, args.metrics, (args.first_day, args.last_day))
+population = iodata.load_population(args.population_path, args.prefecture)
 
 # Define t
-duration = args.last-day - args.first-day
-t = np.linspace(0, duration, (duration+1)*args.ode-step)
+duration = args.last_day - args.first_day
+t = np.linspace(0, duration, (duration+1)*args.ode_step)
 
 # Define model
 if args.model == 'SEIR_ODE':
@@ -73,12 +74,15 @@ if args.model == 'SEIR_ODE':
 else:
     raise ValueError('The model f"{args.model}" is not implemented.')
 
-MCMC.run_mcmc(
+mcmc = MCMC()
+mcmc.run_mcmc(
     log_probability=model.log_probability, 
     theta=model.params.ini,
     random_exponent=model.params.random_exponent, 
     nwalkers=args.walkers, 
     ndim=model.params.ndim, 
+    nstep=args.step, 
+    prior_param_list=model.params.uniform_range, 
     t=t,
     y=data,
     progress=True,
@@ -88,4 +92,4 @@ MCMC.run_mcmc(
 savedir = os.path.join(args.outputdir, f'{today}_{args.title}', f'{args.prefecture}.pickle')
 subprocess.run(['mkdir', '-p', 'savedir'])
 with open(args.outputdir, mode='wb') as f:
-    pickle.dump(savedir, MCMC.sampler)
+    pickle.dump(savedir, mcmc.sampler)

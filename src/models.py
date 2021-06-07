@@ -111,7 +111,7 @@ class SeirOde:
         """
         lp = 0.0
         for i, param in enumerate(theta):
-            lp += getattr(self.prior, prior)(param, prior_param_list[i])
+            lp += getattr(self.prior, prior)(self.prior, param, prior_param_list[i])
         return lp
 
     def log_likelihood(self, theta, t, y, model='linear', likelihood='gaussian'):
@@ -134,10 +134,10 @@ class SeirOde:
         s, e, i, r = self.solve_ode(theta, t)
         s, e, i, r = self.downsampling(t, y, s, e, i, r)
         _, _, _, xi, _, _, tau = theta
-        y_model = getattr(self.calib, model)([s, e, i, r], xi)
-        return getattr(self.likelihood, likelihood)(y, y_model, tau)
+        y_model = getattr(self.calib, model)(self.calib, [s, e, i, r], xi)
+        return getattr(self.likelihood, likelihood)(self.likelihood, y, y_model, tau)
 
-    def log_probability(self, theta, t, y):
+    def log_probability(self, theta, prior_param_list, t, y):
         """ Returns log posterior probability (log prior + log likelihood). 
 
         Parameters
@@ -151,7 +151,7 @@ class SeirOde:
         log posterior probability : float
             ∝ log prior probability + log likelihood
         """
-        lp = self.log_prior(theta)
-        if not np.isinfinite(lp):
+        lp = self.log_prior(theta, prior_param_list)
+        if not np.isfinite(lp):
             return -np.inf
         return lp + self.log_likelihood(theta, t, y)

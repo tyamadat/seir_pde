@@ -42,5 +42,5 @@ def load_population(path, prefecture):
     ----------
     population : int
     """
-    data = pd.read_csv(path)
-    return data[prefecture]
+    data = pd.read_csv(path, header=0, index_col=0)
+    return int(data.loc[prefecture])

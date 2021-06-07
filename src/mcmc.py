@@ -40,7 +40,7 @@ class MCMC:
         return pos
     
     def run_mcmc(self, log_probability, theta, random_exponent, 
-                 nwalkers, ndim, nstep, t, y, progress=True):
+                 nwalkers, ndim, nstep, prior_param_list, t, y, progress=True):
         """ Run MCMC. 
 
         Parameters
@@ -59,5 +59,6 @@ class MCMC:
         progress : bool
         """
         pos = self.param_disperse(theta, random_exponent, nwalkers, ndim)
-        self.sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, args=(t, y))
+        self.sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, 
+                                             args=(prior_param_list, t, y))
         _ = self.sampler.run_mcmc(pos, nstep, progress=progress)
