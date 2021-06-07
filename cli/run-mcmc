@@ -1,0 +1,91 @@
+#!/usr/env python
+
+import os
+import sys
+import argparse
+import subprocess
+import datetime
+sys.path.append('../src')
+today = str(datetime.date.today())
+
+import numpy as np
+import pickle
+
+import iodata
+import models
+from mcmc import MCMC
+
+
+if __name__ != '__main__':
+    sys.exit()
+
+desc = """ 
+       """
+
+# Describe the arguments into the program. 
+parser = argparse.ArgumentParser(description=desc)
+parser.add_argument('-m', '--model', type=str, 
+                    help='The name of a model to be used.')
+parser.add_argument('-t', '--title', type=str, default='', 
+                    help='The description of the mcmc experiment. This is going to be \
+                          the name of directory to be saved.')
+parser.add_argument('-p', '--path', type=str, default='../data/20apr-21may.csv', 
+                    help='The path to the data. This path is going to be the argument \
+                          for io.load_data().')
+parser.add_argument('-o', '--outputdir', type=str, default='../results', 
+                    help='The path to the directory where results are saved.')
+parser.add_argument('-pf', '--prefecture', type=str, default='Tokyo', 
+                    help='The prefecture for which modeling is going to be conducted.')
+parser.add_argument('-m', '--metrics', type=str, default='PositiveRate', 
+                    help='The metrics for which modeling is going to be conducted.')
+parser.add_argument('-fd', '--first-day', type=int, default=0, 
+                    help='The first day from which modeling is going to be conducted.')
+parser.add_argument('-ld', '--last-day', type=int, default=50, 
+                    help='The last day from which modeling is going to be conducted.')
+parser.add_argument('-os', '--ode-step', type=int, default=10000, 
+                    help='The resolution of a solution of ODEs.')
+parser.add_argument('-w', '--walkers', type=int, default=32, 
+                    help='The number of walkers in the ensemble in MCMC.')
+parser.add_argument('-s', '--step', type=int, default=500000, 
+                    help='The number of steps to run in MCMC.')
+parser.add_argument('-pp', '--population-path', type=str, default='../data/population.csv', 
+                    help='The path to the population data for each prefecture.')
+
+
+# Pull the arguments. 
+args = parser.parse_args()
+
+# Read data
+data = iodata.load_data(args.path, args.prefecture, args.metrics, (args.first-day, args.last-day))
+population = iodata.load_population(args.population-path, args.prefecture)
+
+# Define t
+duration = args.last-day - args.first-day
+t = np.linspace(0, duration, (duration+1)*args.ode-step)
+
+# Define model
+if args.model == 'SEIR_ODE':
+    model = models.SeirOde(
+        prefecture=args.prefecture, 
+        population=population, 
+        calibration='PR', 
+)
+else:
+    raise ValueError('The model f"{args.model}" is not implemented.')
+
+MCMC.run_mcmc(
+    log_probability=model.log_probability, 
+    theta=model.params.ini,
+    random_exponent=model.params.random_exponent, 
+    nwalkers=args.walkers, 
+    ndim=model.params.ndim, 
+    t=t,
+    y=data,
+    progress=True,
+)
+
+# Save sampler object
+savedir = os.path.join(args.outputdir, f'{today}_{args.title}', f'{args.prefecture}.pickle')
+subprocess.run(['mkdir', '-p', 'savedir'])
+with open(args.outputdir, mode='wb') as f:
+    pickle.dump(savedir, MCMC.sampler)
