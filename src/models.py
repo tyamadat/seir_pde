@@ -93,7 +93,10 @@ class SeirOde:
         downsampled solution : List[np.ndarray]
         """
         step = len(t) // len(y)
-        return [s[::step], e[::step], i[::step], r[::step]]
+        if len(t) % len(y) == 0:
+            return [s[::step], e[::step], i[::step], r[::step]]
+        else:
+            return [s[::step][:-1], e[::step][:-1], i[::step][:-1], r[::step][:-1]]
 
     def log_prior(self, theta, prior_param_list, prior='uniform'):
         """ Returns log prior probability. 
