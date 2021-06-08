@@ -26,8 +26,8 @@ class SeirOde:
             2.0e-1, # epsilon
             3.8e-1, # rho
             6.4e-7, # xi
-            7.0e-3*population, # e0
-            1.6e-4*population, # i0
+            5.5e-2*population, # e0
+            1.2e-2*population, # i0
             2.4e-3, # tau
         ])
         self.uniform_range = [
@@ -36,7 +36,7 @@ class SeirOde:
             (1e-2, 1.),    # rho
             (1e-10, 1e-5), # xi
             (1, 1e6),      # e0
-            (1, 1e5),      # i0
+            (1, 1e6),      # i0
             (1e-8, 1e2),   # tau
         ]
         self.random_exponent = np.array([

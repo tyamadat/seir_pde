@@ -13,7 +13,6 @@ import pickle
 
 import iodata
 import models
-import params
 from mcmc import MCMC
 
 
@@ -33,7 +32,7 @@ parser.add_argument('-t', '--title', type=str, default='',
 parser.add_argument('-p', '--path', type=str, default='../data/20apr_21may.csv', 
                     help='The path to the data. This path is going to be the argument \
                           for io.load_data().')
-parser.add_argument('-o', '--outputdir', type=str, default='../results', 
+parser.add_argument('-o', '--outputdir', type=str, default='../results/sampler', 
                     help='The path to the directory where results are saved.')
 parser.add_argument('-pf', '--prefecture', type=str, default='Tokyo', 
                     help='The prefecture for which modeling is going to be conducted.')
@@ -51,7 +50,6 @@ parser.add_argument('-s', '--step', type=int, default=500000,
                     help='The number of steps to run in MCMC.')
 parser.add_argument('-pp', '--population-path', type=str, default='../data/population.csv', 
                     help='The path to the population data for each prefecture.')
-
 
 # Pull the arguments
 args = parser.parse_args()
@@ -89,7 +87,7 @@ mcmc.run_mcmc(
 )
 
 # Save sampler object
-savedir = os.path.join(args.outputdir, f'{today}_{args.title}', f'{args.prefecture}.pickle')
-subprocess.run(['mkdir', '-p', 'savedir'])
-with open(args.outputdir, mode='wb') as f:
-    pickle.dump(savedir, mcmc.sampler)
+savedir = os.path.join(args.outputdir, f'{today}_{args.title}')
+subprocess.run(['mkdir', '-p', savedir])
+with open(os.path.join(savedir, f'{args.prefecture}.pickle'), mode='wb') as f:
+    pickle.dump(mcmc.sampler, f)
