@@ -7,7 +7,7 @@
 
 
 import numpy as np
-from scipy.integrate import solve_ivp
+from scipy.integrate import odeint
 
 import utils
 import params
@@ -40,7 +40,7 @@ class SeirOde:
         self.prefecture=prefecture
         self.params = params.SeirOde(population=population)
 
-    def ode(self, t, u, beta, epsilon, rho):
+    def ode(self, u, t, beta, epsilon, rho):
         """ Returns the list of ODE functions
 
         Parameters
@@ -73,10 +73,10 @@ class SeirOde:
         """
         beta, epsilon, rho, _, e0, i0, _ = theta
         args = (beta, epsilon, rho)
-        s0 = self.population - e0 - i0
+        s0 = self.params.population - e0 - i0
         r0 = 0
         u0 = [s0, e0, i0, r0]
-        u_list = solve_ivp(self.ode, t, u0, args=args)
+        u_list = odeint(self.ode, u0, t, args=args)
         s, e, i, r = u_list[:, 0], u_list[:, 1], u_list[:, 2], u_list[:, 3]
         return [s, e, i, r]
 
