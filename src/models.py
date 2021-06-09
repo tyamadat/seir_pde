@@ -95,7 +95,7 @@ class SeirOde:
         step = len(t) // len(y)
         if len(t) % len(y) == 0:
             return [s[::step], e[::step], i[::step], r[::step]]
-        else:
+        else:  # x[::step] becomes len(y)+1 -> remove the final element in the array
             return [s[::step][:-1], e[::step][:-1], i[::step][:-1], r[::step][:-1]]
 
     def log_prior(self, theta, prior_param_list, prior='uniform'):

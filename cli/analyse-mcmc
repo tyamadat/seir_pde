@@ -22,10 +22,15 @@ desc = """
 parser = argparse.ArgumentParser(description=desc)
 parser.add_argument('-m', '--model', type=str, 
                     help='The name of a model to be used.')
-parser.add_argument('-p', '--path', type=str, 
-                    help='The path to the directory where pickled \
-                          emcee.ensemble.EnsembleSampler objects are saved.')
-parser.add_argument('-o', '--outputdir', type=str, default='../results/sampler', 
+parser.add_argument('-t', '--title', type=str, 
+                    help='The description of the mcmc experiment. This is should be  \
+                          the same as used in the run-mcmc.')
+parser.add_argument('-pr', '--prefix', type=str, 
+                    help='The prefix of the .pickle file to be analysed.')
+parser.add_argument('-p', '--path', type=str, default='../results/sampler', 
+                    help='The path to the directory where samplers in each experiment \
+                          is saved.')
+parser.add_argument('-o', '--outputdir', type=str, default='../results/sampler_analysis', 
                     help='The path to the directory where results are saved.')
 parser.add_argument('-d', '--discard', type=int, default=0, 
                     help='Discard the first "discard" steps in the chain as burn-in.')
@@ -44,21 +49,18 @@ else:
     raise ValueError('The model f"{args.model}" is not implemented.')
 
 # Save path
-dirname = os.path.basename(args.path)
-savedir = os.path.join(args.outputdir, f'{dirname}_analysis')
+savedir = os.path.join(args.outputdir, args.title)
 subprocess.run(['mkdir', '-p', savedir])
 
-# Analyse for each sampler in the directory
-file_list = os.listdir(args.path)
-for file in file_list:
-    prefecture = file.split('.pickle')[0]
-    with open(os.path.join(args.path, file), 'rb') as f:
-        sampler = pickle.load(f)
+# Load .pickle file and define Analysis object
+filename = f'{args.prefix}.pickle'
+with open(os.path.join(args.path, filename), 'rb') as f:
+    sampler = pickle.load(f)
+analysis = Analysis(sampler, discard=args.discard, thin=args.thin)
 
-    analysis = Analysis(sampler, discard=args.discard, thin=args.thin)
-    
-    # Scatter plot
-    filename = f'{prefecture}_scatter.{args.format}'
-    fig = plt.figure(figsize=(16, 16))
-    fig = analysis.plot_scatter(fig, param.list)
-    plt.savefig(os.path.join(savedir, filename), format=args.format)
+# Scatter plot
+scatter_dir = os.path.join(savedir, 'scatter')
+subprocess.run(['mkdir', '-p', scatter_dir])
+fig = plt.figure(figsize=(16, 16))
+fig = analysis.plot_scatter(fig, param.list)
+plt.savefig(os.path.join(scatter_dir, args.prefix+args.format), format=args.format)
