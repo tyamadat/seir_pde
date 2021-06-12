@@ -25,8 +25,9 @@ parser.add_argument('-m', '--model', type=str,
 parser.add_argument('-t', '--title', type=str, 
                     help='The description of the mcmc experiment. This is should be  \
                           the same as used in the run-mcmc.')
-parser.add_argument('-pr', '--prefix', type=str, 
-                    help='The prefix of the .pickle file to be analysed.')
+parser.add_argument('-pf', '--prefix', type=str, 
+                    help='The prefix (especially prefecture) of the .pickle file \
+                          to be analysed.')
 parser.add_argument('-p', '--path', type=str, default='../results/sampler', 
                     help='The path to the directory where samplers in each experiment \
                           is saved.')
@@ -34,10 +35,18 @@ parser.add_argument('-o', '--outputdir', type=str, default='../results/sampler_a
                     help='The path to the directory where results are saved.')
 parser.add_argument('-d', '--discard', type=int, default=0, 
                     help='Discard the first "discard" steps in the chain as burn-in.')
-parser.add_argument('-t', '--thin', type=int, default=1, 
+parser.add_argument('-tn', '--thin', type=int, default=1, 
                     help='Use only every "thin" steps from the chain')
 parser.add_argument('-f', '--format', type=str, default='png', 
                     help='The format of the output files.')
+parser.add_argument('-a', '--all', action='store_true', 
+                    help='Conduct all the analyses')
+parser.add_argument('-ft', '--fitting', action='store_true', 
+                    help='aa')
+parser.add_argument('-sc', '--scatter', action='store_true', 
+                    help='Plot scatter.')
+parser.add_argument('-cn', '--convergence', action='store_true', 
+                    help='Conduct the convergence analysis.')
 
 # Pull the arguments
 args = parser.parse_args()
@@ -54,13 +63,30 @@ subprocess.run(['mkdir', '-p', savedir])
 
 # Load .pickle file and define Analysis object
 filename = f'{args.prefix}.pickle'
-with open(os.path.join(args.path, filename), 'rb') as f:
+with open(os.path.join(args.path, args.title, filename), 'rb') as f:
     sampler = pickle.load(f)
 analysis = Analysis(sampler, discard=args.discard, thin=args.thin)
 
+# Fitting curve
+fitting_dir = os.path.join(savedir, 'fitting')
+subprocess.run(['mkdir', '-p', fitting_dir])
+
 # Scatter plot
-scatter_dir = os.path.join(savedir, 'scatter')
-subprocess.run(['mkdir', '-p', scatter_dir])
-fig = plt.figure(figsize=(16, 16))
-fig = analysis.plot_scatter(fig, param.list)
-plt.savefig(os.path.join(scatter_dir, args.prefix+args.format), format=args.format)
+if args.all or args.scatter:
+    scatter_dir = os.path.join(savedir, 'scatter')
+    subprocess.run(['mkdir', '-p', scatter_dir])
+    fig = plt.figure(figsize=(16, 16))
+    fig = analysis.plot_scatter(fig, param.list)
+    plt.savefig(os.path.join(scatter_dir, f'{args.prefix}.{args.format}'), format=args.format)
+    plt.clf()
+    plt.close()
+
+# Convergence analysis
+if args.all or args.convergence:
+    convergence_dir = os.path.join(savedir, 'convergence')
+    subprocess.run(['mkdir', '-p', convergence_dir])
+    fig = plt.figure(figsize=(12, 8))
+    fig = analysis.plot_convergence(fig)
+    plt.savefig(os.path.join(convergence_dir, f'{args.prefix}.{args.format}'), format=args.format)
+    plt.clf()
+    plt.close()
