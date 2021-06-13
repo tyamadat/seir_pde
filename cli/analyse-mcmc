@@ -85,8 +85,8 @@ if args.all or args.scatter:
 if args.all or args.convergence:
     convergence_dir = os.path.join(savedir, 'convergence')
     subprocess.run(['mkdir', '-p', convergence_dir])
-    fig = plt.figure(figsize=(12, 8))
-    fig = analysis.plot_convergence(fig)
+    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+    ax = analysis.plot_convergence(ax)
     plt.savefig(os.path.join(convergence_dir, f'{args.prefix}.{args.format}'), format=args.format)
     plt.clf()
     plt.close()

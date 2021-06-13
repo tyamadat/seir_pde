@@ -6,6 +6,7 @@
 """
 
 import numpy as np
+import matplotlib.pyplot as plt
 import emcee
 import corner
 
@@ -74,7 +75,7 @@ class Analysis:
         corner.corner(self.flat_samples, labels=labels, fig=fig)
         return fig
 
-    def plot_convergence(self, fig):
+    def plot_convergence(self, ax):
         chain = self.sampler.get_chain()[:, :, 0].T
         
         # Compute the extimators for a few different chain lengths
@@ -84,15 +85,17 @@ class Analysis:
             autocorr[i] = self.autocorr(chain[:, :n])
         
         # Plot the comparisons
-        fig.loglog(N, autocorr, '-o', label='Integrated autocorrelation')
+        ax.plot(N, autocorr, '-o', label='Integrated autocorrelation')
+        ax.set_xscale('log', base=10)
+        ax.set_yscale('log', base=10)
         ylim = plt.gca().get_ylim()
-        fig.plot(N, N / 50.0, '--k', label=r'$\tau = N/50$')
-        fig.set_ylim(ylim)
-        fig.set_xlabel('number of samples, $N$')
-        fig.set_ylabel(r'$\tau$ estimates')
-        fig.legend(fontsize=14)
-        
-        return fig
+        ax.plot(N, N / 50.0, '--k', label=r'$\tau = N/50$')
+        ax.set_ylim(ylim)
+        ax.set_xlabel('number of samples, $N$')
+        ax.set_ylabel(r'$\tau$ estimates')
+        ax.legend(fontsize=14)
+
+        return ax
 
     def next_pow_two(self, n):
         """ Returns the next power of two greated than or equal to 'n'.
