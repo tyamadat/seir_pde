@@ -57,19 +57,15 @@ if args.model == 'SEIR_ODE':
 else:
     raise ValueError('The model f"{args.model}" is not implemented.')
 
-# Save path
-savedir = os.path.join(args.outputdir, args.title)
-subprocess.run(['mkdir', '-p', savedir])
-
 # Load .pickle file and define Analysis object
 filename = f'{args.prefix}.pickle'
 with open(os.path.join(args.path, args.title, filename), 'rb') as f:
     sampler = pickle.load(f)
 analysis = Analysis(sampler, discard=args.discard, thin=args.thin)
 
-# Fitting curve
-fitting_dir = os.path.join(savedir, 'fitting')
-subprocess.run(['mkdir', '-p', fitting_dir])
+# Save path
+savedir = os.path.join(args.outputdir, args.title)
+subprocess.run(['mkdir', '-p', savedir])
 
 # Scatter plot
 if args.all or args.scatter:

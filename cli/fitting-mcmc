@@ -6,14 +6,14 @@ import argparse
 import subprocess
 import datetime
 sys.path.append('../src')
-today = str(datetime.date.today())
 
 import numpy as np
 import pickle
+import matplotlib.pyplot as plt
 
 import iodata
 import models
-from mcmc import MCMC
+from mcmc import Fitting
 
 
 if __name__ != '__main__':
@@ -32,7 +32,10 @@ parser.add_argument('-t', '--title', type=str, default='',
 parser.add_argument('-p', '--path', type=str, default='../data/20apr_21may.csv', 
                     help='The path to the data. This path is going to be the argument \
                           for io.load_data().')
-parser.add_argument('-o', '--outputdir', type=str, default='../results/sampler', 
+parser.add_argument('-sp', '--sampler-path', type=str, default='../results/sampler', 
+                    help='The path to the directory where samplers in each experiment \
+                          is saved.')
+parser.add_argument('-o', '--outputdir', type=str, default='../results/sampler_analysis', 
                     help='The path to the directory where results are saved.')
 parser.add_argument('-pf', '--prefecture', type=str, default='Tokyo', 
                     help='The prefecture for which modeling is going to be conducted.')
@@ -44,12 +47,14 @@ parser.add_argument('-ld', '--last-day', type=int, default=50,
                     help='The last day from which modeling is going to be conducted.')
 parser.add_argument('-os', '--ode-step', type=int, default=1000, 
                     help='The resolution of a solution of ODEs.')
-parser.add_argument('-w', '--walkers', type=int, default=32, 
-                    help='The number of walkers in the ensemble in MCMC.')
-parser.add_argument('-s', '--step', type=int, default=500000, 
-                    help='The number of steps to run in MCMC.')
+parser.add_argument('-d', '--discard', type=int, default=0, 
+                    help='Discard the first "discard" steps in the chain as burn-in.')
+parser.add_argument('-tn', '--thin', type=int, default=1, 
+                    help='Use only every "thin" steps from the chain')
 parser.add_argument('-pp', '--population-path', type=str, default='../data/population.csv', 
                     help='The path to the population data for each prefecture.')
+parser.add_argument('-f', '--format', type=str, default='png', 
+                    help='The format of the output files.')
 
 # Pull the arguments
 args = parser.parse_args()
@@ -57,6 +62,11 @@ args = parser.parse_args()
 # Load data
 data = iodata.load_data(args.path, args.prefecture, args.metrics, (args.first_day, args.last_day))
 population = iodata.load_population(args.population_path, args.prefecture)
+
+# Load sampler
+filename = f'{args.prefecture}.pickle'
+with open(os.path.join(args.sampler_path, args.title, filename), 'rb') as f:
+    sampler = pickle.load(f)
 
 # Define t
 duration = args.last_day - args.first_day
@@ -72,22 +82,20 @@ if args.model == 'SEIR_ODE':
 else:
     raise ValueError('The model f"{args.model}" is not implemented.')
 
-mcmc = MCMC()
-mcmc.run_mcmc(
-    log_probability=model.log_probability, 
-    theta=model.params.ini,
-    random_exponent=model.params.random_exponent, 
-    nwalkers=args.walkers, 
-    ndim=model.params.ndim, 
-    nstep=args.step, 
-    prior_param_list=model.params.uniform_range, 
-    t=t,
-    y=data,
-    progress=True,
-)
+# Create fitting object
+fitting = Fitting(data, model, sampler, args.discard, args.thin)
 
-# Save sampler object
-savedir = os.path.join(args.outputdir, f'{today}_{args.title}')
+# Save path
+savedir = os.path.join(args.outputdir, args.title)
 subprocess.run(['mkdir', '-p', savedir])
-with open(os.path.join(savedir, f'{args.prefecture}.pickle'), mode='wb') as f:
-    pickle.dump(mcmc.sampler, f)
+
+# Fitting curve
+fitting_dir = os.path.join(savedir, 'fitting')
+subprocess.run(['mkdir', '-p', fitting_dir])
+fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+ax = fitting.plot_data(ax)
+ax = fitting.plot_median(ax, t)
+ax = fitting.plot_credible_interval(ax, t)
+plt.savefig(os.path.join(fitting_dir, f'{args.prefecture}.{args.format}'), format=args.format)
+plt.clf()
+plt.close()

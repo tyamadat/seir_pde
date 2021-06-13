@@ -63,13 +63,48 @@ class MCMC:
         _ = self.sampler.run_mcmc(pos, nstep, progress=progress)
 
 
+class Fitting:
+    """
+    """
+    def __init__(self, data, model, sampler, discard=0, thin=1):
+        self.data = data
+        self.x = np.arange(len(data))
+        self.model = model
+        self.flat_samples = sampler.get_chain(discard=discard, thin=thin, flat=True)
+    
+    def plot_data(self, ax):
+        ax.plot(self.x, self.data, color='orange')
+        return ax
+
+    def estimate(self, theta, t):
+        xi = theta[3]
+        s, e, i, r = self.model.solve_ode(theta, t)
+        s, e, i, r = self.model.downsampling(t, self.data, s, e, i, r)
+        return xi * i
+    
+    def plot_median(self, ax, t):
+        median = np.median(self.flat_samples, axis=0)
+        est = self.estimate(median, t)
+        ax.plot(self.x, est, color='dodgerblue')
+        return ax
+
+    def plot_credible_interval(self, ax, t, ode_step=1000):
+        l_lim = np.percentile(self.flat_samples, 2.5, axis=0)
+        u_lim = np.percentile(self.flat_samples, 97.5, axis=0)
+        l_est = self.estimate(l_lim, t)
+        u_est = self.estimate(u_lim, t)
+        ax.plot(self.x, l_est, color='orchid')
+        ax.plot(self.x, u_est, color='orchid')
+        ax.fill_between(self.x, l_est, u_est, color='orchid', alpha=0.5)
+        return ax
+
+
 class Analysis:
     """
     """
     def __init__(self, sampler, discard=0, thin=1):
         self.sampler = sampler
         self.flat_samples = sampler.get_chain(discard=discard, thin=thin, flat=True)
-        print(len(self.flat_samples))
 
     def plot_scatter(self, fig, labels):
         corner.corner(self.flat_samples, labels=labels, fig=fig)
