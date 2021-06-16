@@ -185,11 +185,12 @@ class GraphDiff(SeirOde):
     """
     def __init__(self, g, arr_pop, calibration='PR'):
         super().__init__(calibration=calibration)
+        self.params = params.GraphDiff(n_pref=g.number_of_nodes())
         self.g = g
         self.L = nx.linalg.laplacianmatrix.laplacian_matrix(g).toarray()
         self.n_pref = nx.number_of_nodes(g)
         self.arr_pop = arr_pop
-    
+
     def ode(self, u, t, beta, epsilon, rho, d):
         """
 
@@ -232,7 +233,7 @@ class GraphDiff(SeirOde):
         e0 = e0 * self.arr_pop
         i0 = i0 * self.arr_pop
         s0 = self.arr_pop - e0 - i0
-        r0 = np.zeros(n_pref)
+        r0 = np.zeros(self.n_pref)
         u0 = [s0, e0, i0, r0]
 
         u_list = odeintw(self.ode, u0, t, args=args)

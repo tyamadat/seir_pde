@@ -6,6 +6,7 @@
 """
 
 import numpy as np
+import networkx as nx
 
 
 class Prior:
@@ -69,3 +70,37 @@ class PositiveRate(Calibration):
     def linear(self, sol, xi):
         _, _, i, _ = sol
         return xi * i
+
+
+class PrefectureNetwork:
+    """ Graph network of prefectures
+    """
+    def __init__(self):
+        self.g = nx.Graph()
+
+    def build(self, df, c_type='Adjuscent'):
+        """
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            dataframe which contains information for each prefecture and \
+            prefectures to be connected to it. \
+            index : prefecture index, columns = ['Prefecture', 'Adjuscent', ...]
+        c_type : str, default='Adjuscent'
+            type of connection between prefectures.
+        """
+        # create nodes
+        for i in df.index:
+            self.g.add_node(i, 
+                            prefecture=df.loc[i, 'Prefecture'], 
+                            connect=df.loc[i, c_type])
+
+        # connect nodes with each other based on the connect information in the df
+        for i in df.index:
+            connect_list = self.g.node[i]['connect']
+            for connect_pref in connect_list:
+                if connect_pref in list(nx.get_node_attributes(self.g, 'prefecture').values()):
+                    self.g.add_edge(i, df[df['Prefecture']==connect_pref].index[0])
+                else:
+                    pass

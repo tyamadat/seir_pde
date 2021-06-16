@@ -5,6 +5,10 @@
 
 """
 
+import os
+os.environ['OMP_NUM_THREADS'] = '1'
+from multiprocessing import Pool
+
 import numpy as np
 import matplotlib.pyplot as plt
 import emcee
@@ -15,12 +19,12 @@ class MCMC:
     def __init__(self):
         pass
 
-    def param_disperse(self, theta, random_exponent, nwalkers, ndim):
+    def param_disperse_simple(self, args):
         """ Returns dispersed initial parameter values for MCMC. 
 
         Parameters
         ----------
-        theta : np.ndarray, shape=(nparam,)
+        theta_ini : np.ndarray, shape=(nparam,)
             initial parameter values
         random_exponent : np.ndarray, shape=(nparam,)
             10^(exponent) is the coefficient of the standard normal distribution 
@@ -32,20 +36,44 @@ class MCMC:
         ----------
         dispersed parameters : np.ndarray, shape=(nwalkers, nparam(ndim))
         """
+        theta_ini, random_exponent, nwalkers, ndim = args
+
         pos = np.array([])
         for i in range(nwalkers):
-            pos = np.append(pos, theta + random_exponent * np.random.randn(ndim))
+            pos = np.append(pos, theta_ini + random_exponent * np.random.randn(ndim))
+        pos = pos.reshape(nwalkers, ndim)
+        return pos
+
+    def param_disperse_complex(self, args):
+        """
+
+        Parameters
+        ----------
+        theta_ini : np.ndarray
+        random_exponent : List[float]
+        nwalkers : int
+        ndim : int
+
+        Return
+        ----------
+        dispersed parameters : np.ndarray, shape=(nwalkers, nparam)
+        """
+        theta_ini_all, random_exponent_all, nwalkers, ndim = args
+        pos = np.array([])
+        for i in range(nwalkers):
+            pos = np.append(pos, theta_ini_all + random_exponent_all * np.random.randn(ndim))
         pos = pos.reshape(nwalkers, ndim)
         return pos
     
-    def run_mcmc(self, log_probability, theta, random_exponent, 
-                 nwalkers, ndim, nstep, prior_param_list, t, y, progress=True):
+    def run_mcmc(self, log_probability, theta_ini, random_exponent, nwalkers, ndim, nstep, 
+                 prior_param_list, t, y, param_num=None, disperse_method='simple', 
+                 nprocess=1, progress=True):
         """ Run MCMC. 
 
         Parameters
         ----------
         log_probability : func
-        theta : np.ndarray, shape=(nparam,)
+        theta_ini : np.ndarray, shape=(nparam,)
             initial parameter values
         random_exponent : np.ndarray, shape=(nparam,)
             10^(exponent) is the coefficient of the standard normal distribution 
@@ -55,12 +83,35 @@ class MCMC:
         nstep : int
         t : np.ndarray
         y : np.ndarray
+        nprocess : int
+            number of CPUs to be used. 
         progress : bool
+            whether to show the progress bar of MCMC. 
         """
-        pos = self.param_disperse(theta, random_exponent, nwalkers, ndim)
-        self.sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, 
-                                             args=(prior_param_list, t, y))
-        _ = self.sampler.run_mcmc(pos, nstep, progress=progress)
+        if disperse_method == 'simple':
+            args = (theta_ini, random_exponent, nwalkers, ndim)
+        elif disperse_method == 'complex':
+            # expand redundant parameters
+            theta_ini_all = []
+            random_exponent_all = []
+            prior_param_list_all = []
+            for i, num in enumerate(param_num):
+                theta_ini_all = theta_ini_all + [theta_ini[i]] * num
+                random_exponent_all = random_exponent_all + [random_exponent[i]] * num
+                prior_param_list_all = prior_param_list_all + [prior_param_list[i]] * num
+            theta_ini_all = np.array(theta_ini_all)
+            random_exponent_all = np.array(random_exponent_all)
+            prior_param_list = prior_param_list_all
+
+            args = (theta_ini_all, random_exponent_all, nwalkers, ndim)
+
+        with Pool() as pool:
+            pos = getattr(self, f'param_disperse_{disperse_method}')(args)
+            # pos = self.param_disperse(theta_ini, random_exponent, nwalkers, ndim)
+            self.sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, 
+                                                 args=(prior_param_list, t, y), 
+                                                 pool=pool)
+            _ = self.sampler.run_mcmc(pos, nstep, progress=progress)
 
 
 class Fitting:
@@ -107,10 +158,14 @@ class Analysis:
         self.flat_samples = sampler.get_chain(discard=discard, thin=thin, flat=True)
 
     def plot_scatter(self, fig, labels):
+        """ See parameter distributions. 
+        """
         corner.corner(self.flat_samples, labels=labels, fig=fig)
         return fig
 
     def plot_convergence(self, ax):
+        """ Judge convergence of MCMC based on autocorrelation function. 
+        """
         chain = self.sampler.get_chain()[:, :, 0].T
         
         # Compute the extimators for a few different chain lengths
