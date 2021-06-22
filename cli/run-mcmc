@@ -31,13 +31,15 @@ parser.add_argument('-m', '--model', type=str,
 parser.add_argument('-t', '--title', type=str, default='', 
                     help='The description of the mcmc experiment. This is going to be \
                           the name of directory to be saved.')
-parser.add_argument('-p', '--path', type=str, default='../data/20apr_21may.csv', 
+parser.add_argument('-p', '--path', type=str, default='../data/20mar_21may.csv', 
                     help='The path to the data. This path is going to be the argument \
                           for io.load_data().')
 parser.add_argument('-o', '--outputdir', type=str, default='../results/sampler', 
                     help='The path to the directory where results are saved.')
 parser.add_argument('-pf', '--prefecture', type=str, default='Tokyo', 
                     help='The prefecture for which modeling is going to be conducted.')
+parser.add_argument('-cl', '--calibration', type=str, default='NC',
+                    help='How to calibrate the model to the observed data.')
 parser.add_argument('-ct', '--connectivity-type', type=str, default='Adjuscent', 
                     help='The type of connectivity to be considered when constructing \
                           a network of prefectures.')
@@ -49,7 +51,7 @@ parser.add_argument('-nrt', '--network-range-ter', type=int, default=None,
                     help='The terminal value of prefecture indexes to be considered. e.g., \
                           Kanto region: (8, 14) (8, 9, 10, 11, 12, 13, 14). \
                           Warning: adjusted to pd.DataFrame.loc[]!')               
-parser.add_argument('-ms', '--metrics', type=str, default='positiveRate', 
+parser.add_argument('-ms', '--metrics', type=str, default='aveNewTestedPositive', 
                     help='The metrics for which modeling is going to be conducted.')
 parser.add_argument('-fd', '--first-day', type=int, default=0, 
                     help='The first day from which modeling is going to be conducted.')
@@ -76,10 +78,13 @@ data = iodata.load_data(args.path, args.prefecture, args.metrics, (args.first_da
 
 # Define t
 duration = args.last_day - args.first_day
-t = np.linspace(0, duration, (duration+1)*args.ode_step)
+t = np.linspace(0, duration, duration*args.ode_step+1)
 
 # Define model
 if args.model == 'SEIR_ODE':
+    # Save file name = prefecture name
+    save_file = args.prefecture
+
     # Load data
     data = iodata.load_data(args.path, args.prefecture, args.metrics, (args.first_day, args.last_day))
     population = iodata.load_population(args.population_path, args.prefecture)
@@ -90,10 +95,14 @@ if args.model == 'SEIR_ODE':
     model = models.SeirOde(
         prefecture=args.prefecture, 
         population=population, 
-        calibration='PR', 
+        calibration=args.calibration, 
 )
 elif args.model == 'GRAPH_DIFFUSION':
     network_range = (args.network_range_ini, args.network_range_ter)
+
+    # Save file name = network_range
+    save_file = f'Prefectures_{args.network_range_ini}-{args.network_range_ter}'
+
     # Load data
     data = iodata.load_data_matrix(args.path, network_range, args.metrics, (args.first_day, args.last_day))
     pref_connect_df = iodata.load_prefecture_network(args.network_path)
@@ -115,7 +124,7 @@ elif args.model == 'GRAPH_DIFFUSION':
     model = models.GraphDiff(
         g=pn.g, 
         arr_pop= arr_pop, 
-        calibration='PR', 
+        calibration=args.calibration, 
     )
 else:
     raise ValueError('The model f"{args.model}" is not implemented.')
@@ -140,5 +149,5 @@ mcmc.run_mcmc(
 # Save sampler object
 savedir = os.path.join(args.outputdir, f'{today}_{args.title}')
 subprocess.run(['mkdir', '-p', savedir])
-with open(os.path.join(savedir, f'{args.prefecture}.pickle'), mode='wb') as f:
+with open(os.path.join(savedir, f'{save_file}.pickle'), mode='wb') as f:
     pickle.dump(mcmc.sampler, f)

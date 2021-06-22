@@ -25,7 +25,7 @@ parser.add_argument('-m', '--model', type=str,
 parser.add_argument('-t', '--title', type=str, 
                     help='The description of the mcmc experiment. This is should be  \
                           the same as used in the run-mcmc.')
-parser.add_argument('-pf', '--prefix', type=str, 
+parser.add_argument('-pf', '--prefix', type=str, default=None, 
                     help='The prefix (especially prefecture) of the .pickle file \
                           to be analysed.')
 parser.add_argument('-p', '--path', type=str, default='../results/sampler', 
@@ -41,8 +41,6 @@ parser.add_argument('-f', '--format', type=str, default='png',
                     help='The format of the output files.')
 parser.add_argument('-a', '--all', action='store_true', 
                     help='Conduct all the analyses')
-parser.add_argument('-ft', '--fitting', action='store_true', 
-                    help='aa')
 parser.add_argument('-sc', '--scatter', action='store_true', 
                     help='Plot scatter.')
 parser.add_argument('-cn', '--convergence', action='store_true', 
@@ -54,6 +52,16 @@ args = parser.parse_args()
 # Define model
 if args.model == 'SEIR_ODE':
     param = params.SeirOde()
+    param_label = param.list
+elif args.model == 'GraphDiff':
+    param = params.GraphDiff()
+    param_label = []
+    for i, param_name in enumerate(param.list):
+        if param.param_num[i] > 1:
+            for j in range(1, param.param_num[i]+1):
+                param_label = param_label + [f'{param_name}{j}']
+        else:
+            param_label = param_label + [param_name]
 else:
     raise ValueError('The model f"{args.model}" is not implemented.')
 
@@ -72,7 +80,7 @@ if args.all or args.scatter:
     scatter_dir = os.path.join(savedir, 'scatter')
     subprocess.run(['mkdir', '-p', scatter_dir])
     fig = plt.figure(figsize=(16, 16))
-    fig = analysis.plot_scatter(fig, param.list)
+    fig = analysis.plot_scatter(fig, param_label)
     plt.savefig(os.path.join(scatter_dir, f'{args.prefix}.{args.format}'), format=args.format)
     plt.clf()
     plt.close()

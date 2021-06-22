@@ -32,15 +32,21 @@ class SeirOde:
     calibration : str, default 'PR' (positive rate)
 
     """
-    def __init__(self, prefecture='Tokyo', population=1e7, calibration='PR'):
+    def __init__(self, prefecture='Tokyo', population=1e7, calibration='NC'):
         self.prior = utils.Prior
-        self.likelihood = utils.Likelihood
-        if calibration == 'PR':
-            self.calib = utils.PositiveRate
+        self.likelihood = utils.Likelihood()
+        self.params = params.SeirOde(population=population)
+        if calibration == 'NC': # New case
+            self.calib = utils.NewCase()
+            self.model = 'i'
+            self.params.set_nc()
+        elif calibration == 'PR': # Positive rate
+            self.calib = utils.PositiveRate()
+            self.model = 'linear'
+            self.params.set_pr()
         else:
             raise ValueError(f'Calibration "{calibration} is not implemented."')
         self.prefecture=prefecture
-        self.params = params.SeirOde(population=population)
 
     def ode(self, u, t, beta, epsilon, rho):
         """ Returns the list of ODE functions
@@ -119,7 +125,7 @@ class SeirOde:
             lp += getattr(self.prior, prior)(self.prior, param, prior_param_list[i])
         return lp
 
-    def log_likelihood(self, theta, t, y, n_beta=1, model='linear', likelihood='gaussian'):
+    def log_likelihood(self, theta, t, y, n_beta=1, likelihood='gaussian'):
         """ Returns log likelihood value for an observed value based on the model.
 
         Parameters
@@ -142,8 +148,9 @@ class SeirOde:
         s, e, i, r = self.downsampling(t, y, s, e, i, r)
         xi = theta[n_beta:][2]
         tau = theta[n_beta:][5]
-        y_model = getattr(self.calib, model)(self.calib, [s, e, i, r], xi)
-        return getattr(self.likelihood, likelihood)(self.likelihood, y, y_model, tau)
+        # y_model = getattr(self.calib, self.model)(self.calib, [s, e, i, r], xi)
+        y_model = getattr(self.calib, self.model)([s, e, i, r], xi)
+        return getattr(self.likelihood, likelihood)(y, y_model, tau)
 
     def log_probability(self, theta, prior_param_list, t, y):
         """ Returns log posterior probability (log prior + log likelihood). 

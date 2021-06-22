@@ -63,6 +63,15 @@ class Calibration:
         pass
 
 
+class NewCase(Calibration):
+    def __init__(self):
+        pass
+
+    def i(self, sol, xi):
+        _, _, i, _ = sol
+        return xi * i
+
+
 class PositiveRate(Calibration):
     def __init__(self):
         pass
