@@ -82,6 +82,11 @@ class SeirOde:
         ])
 
 
+class SeirPde:
+    def __init__(self):
+        pass
+
+
 class GraphDiff:
     def __init__(self, n_pref=47):
         self.list = [

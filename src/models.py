@@ -8,6 +8,7 @@
 
 import numpy as np
 from scipy.integrate import odeint
+from scipy.sparse import dia_matrix, identity
 from odeintw import odeintw
 import networkx as nx
 
@@ -67,7 +68,7 @@ class SeirOde:
         drdt = rho*i
         return [dsdt, dedt, didt, drdt]
 
-    def solve_ode(self, theta, t):
+    def solve(self, theta, t):
         """ Returns a solution for the ODEs. 
 
         Parameters
@@ -144,7 +145,7 @@ class SeirOde:
         ----------
         log likelihood : np.float
         """
-        s, e, i, r = self.solve_ode(theta, t)
+        s, e, i, r = self.solve(theta, t)
         s, e, i, r = self.downsampling(t, y, s, e, i, r)
         xi = theta[n_beta:][2]
         tau = theta[n_beta:][5]
@@ -170,6 +171,97 @@ class SeirOde:
         if not np.isfinite(lp):
             return -np.inf
         return lp + self.log_likelihood(theta, t, y)
+
+
+class SeirPde(SeirOde):
+    """ Diffusion model from Tokyo (described by ODE) described by PDE. 
+    """
+    def __init__(self, prefecture='Tokyo', population=1e7, calibration='NC'):
+        super().__init__(prefecture=prefecture, population=population, calibration=calibration)
+        self.params = params.SeirPde()
+
+    def pde(self, u, t, A, dx, beta, epsilon, rho):
+        """ Describe PDE as a set of ODEs by a central difference approximation in space. \
+        Initial condition: u[0, 0]=u[0], u[x, 0]=0 (x!=0) \
+        Boundary condition: Neumann boundary condition
+
+        Parameters
+        ----------
+        u : List[np.ndarray], shape=(4, )
+        t : np.ndarray
+            mesh points in time
+        A : scipy.sparse
+            operator for calculating diffusion term
+        dx : float
+            spatial resolution. 
+        """
+        s, e, i, r = u
+
+        dsdt = A.dot(s) / dx**2
+        dedt = A.dot(e) / dx**2
+        didt = A.dot(i) / dx**2
+        drdt = A.dot(r) / dx**2
+
+        # boundary condition at x=0
+        dsdt[0] = -beta*i[0]*s[0]
+        dedt[0] = beta*i[0]*s[0] - epsilon*e[0]
+        didt[0] = epsilon*e[0] - rho*i[0]
+        drdt[0] = rho*i[0]
+        
+        return [dsdt, dedt, didt, drdt]
+
+    def solve(self, theta, t):
+        """ Returns PDE solutions. 
+
+        Parameters
+        ----------
+        theta : np.ndarray, shape=(nparam)
+            n : number of points in space
+            D : diffusion coefficient
+            L : upper limit of space (lower limit: 0)
+
+        Return
+        ----------
+        u : List[np.ndarray]
+            solution for the PDEs
+        """
+        n, D, L, beta, epsilon, rho, _, e0, i0, _ = theta
+        x = np.linspace(0, L, n+1) # mesh points in space
+        dx = x[1] - x[0] # spatial resolution
+        A = self.gen_operator(n)
+        args = (A, dx, beta, epsilon, rho)
+        
+        # Set initial conditions
+        s0 = self.params.population - e0 - i0
+        s0 = np.append(s0, np.zeros(n))
+        e0 = np.append(e0, np.zeros(n))
+        i0 = np.append(i0, np.zeros(n))
+        r0 = np.zeros(n+1)
+
+        u0 = [s0, e0, i0, r0]
+        u_list = odeintw(self.pde, u0, args=args)
+        s, e, i, r = u_list[:, 0], u_list[:, 1], u_list[:, 2], u_list[:, 3]
+        return [s, e, i, r]
+
+    def gen_operator(self, n):
+        """ Returns operator for calculating diffusion term. 
+
+        Parameters
+        ----------
+        n : int
+
+        Return
+        ----------
+        A : scipy.sparse.csr.csr_matrix
+        """
+        # Using a forward difference in time and a central difference in space
+        mx = np.array([np.ones(n+1), -2.0*np.ones(n+1), np.ones(n+1)])
+        mx[0, n-1] = 2 # for boundary condition at x=L (Neumann boundary condition)
+        offsets = np.array([-1, 0, 1])
+        B = dia_matrix((mx, offsets), shape=(n+1, n+1)) # create diagonal matrix
+        E = identity(n+1)
+        A = E + D*B
+        return A
 
 
 class GraphDiff(SeirOde):
@@ -216,7 +308,7 @@ class GraphDiff(SeirOde):
         drdt = rho*i + self.L.dot(d*beta*r)
         return [dsdt, dedt, didt, drdt]
 
-    def solve_ode(self, theta, t):
+    def solve(self, theta, t):
         """
 
         Parameters
