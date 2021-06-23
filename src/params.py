@@ -83,8 +83,8 @@ class SeirOde:
 
 
 class SeirPde:
-    def __init__(self):
-        pass
+    def __init__(self, population=1e7):
+        self.population = population
 
 
 class GraphDiff:

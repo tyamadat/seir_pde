@@ -1,0 +1,91 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import argparse
+import subprocess
+import datetime
+sys.path.append('../src')
+today = str(datetime.date.today())
+
+import numpy as np
+import pickle
+
+import iodata
+import models
+
+
+if __name__ != '__main__':
+    sys.exit()
+
+desc = """ 
+       """
+
+# Describe the arguments into the program. 
+parser = argparse.ArgumentParser(description=desc)
+parser.add_argument('-t', '--title', type=str, default='', 
+                    help='The description of the mcmc experiment. This is going to be \
+                          the name of directory to be saved.')
+parser.add_argument('-o', '--outputdir', type=str, default='../results/pde_sol', 
+                    help='The path to the directory where results are saved.')
+parser.add_argument('-pf', '--prefecture', type=str, default='Tokyo', 
+                    help='The prefecture for which modeling is going to be conducted.')
+parser.add_argument('-n', '--npoints', type=int, 
+                    help='Number of points in space in PDE.')
+parser.add_argument('-dc', '--diffusion-coefficient', type=float, 
+                    help='Diffusion coefficient in diffusion equations.')
+parser.add_argument('-l', '--length', type=float, 
+                    help='Upper limit of space (lower limit: 0).')
+parser.add_argument('-sp', '--sampler-path', type=str, default='../results/sampler', 
+                    help='The path to the directory where samplers in each experiment \
+                          is saved.')
+parser.add_argument('-d', '--discard', type=int, default=0, 
+                    help='Discard the first "discard" steps in the chain as burn-in.')
+parser.add_argument('-tn', '--thin', type=int, default=1, 
+                    help='Use only every "thin" steps from the chain')
+parser.add_argument('-pm', '--parameter-method', type=str, default='median', 
+                    help='How to determine the representative parameter set from \
+                          MCMC sampler. median / mean')
+parser.add_argument('-fd', '--first-day', type=int, default=0, 
+                    help='The first day from which modeling is going to be conducted.')
+parser.add_argument('-ld', '--last-day', type=int, default=50, 
+                    help='The last day from which modeling is going to be conducted.')
+parser.add_argument('-os', '--ode-step', type=int, default=1000, 
+                    help='The resolution of a solution of ODEs.')
+parser.add_argument('-pp', '--population-path', type=str, default='../data/population.csv', 
+                    help='The path to the population data for each prefecture.')
+
+# Pull the arguments
+args = parser.parse_args()
+
+# Define t (mesh points in time)
+duration = args.last_day - args.first_day
+t = np.linspace(0, duration, duration*args.ode_step + 1)
+
+# Define model
+population = iodata.load_population(args.population_path, args.prefecture)
+model = models.SeirPde(
+    prefecture=args.prefecture, 
+    population=population, 
+)
+
+# Load sampler and extract representative parameters
+filename = f'{args.prefecture}.pickle'
+with open(os.path.join(args.sampler_path, args.title, filename), 'rb') as f:
+    sampler = pickle.load(f)
+flat_samples = sampler.get_chain(discard=args.discard, thin=args.thin, flat=True)
+beta, epsilon, rho, xi, e0, i0, tau = getattr(np, args.parameter_method)(flat_samples, axis=0)
+n = args.npoints
+D = args.diffusion_coefficient
+L = args.length
+theta = [n, D, L, beta, epsilon, rho, xi, e0, i0, tau]
+
+# Solve PDE
+sol = model.solve(theta, t)
+
+# Save solutions
+savefile = f'day{args.first_day}-{args.last_day}_n{n}_d{D}_l{L}'
+savedir = os.path.join(args.outputdir, f'{today}_{args.title}')
+subprocess.run(['mkdir', '-p', savedir])
+with open(os.path.join(savedir, f'{save_file}.pickle'), mode='wb') as f:
+    pickle.dump(sol, f)

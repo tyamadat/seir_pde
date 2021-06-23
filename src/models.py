@@ -5,6 +5,10 @@
 
 """
 
+import os
+os.environ["OPENBLAS_NUM_THREADS"] = '1'
+os.environ["MKL_NUM_THREADS"] = '1'
+os.environ["VECLIB_NUM_THREADS"] = '1'
 
 import numpy as np
 from scipy.integrate import odeint
@@ -176,8 +180,8 @@ class SeirOde:
 class SeirPde(SeirOde):
     """ Diffusion model from Tokyo (described by ODE) described by PDE. 
     """
-    def __init__(self, prefecture='Tokyo', population=1e7, calibration='NC'):
-        super().__init__(prefecture=prefecture, population=population, calibration=calibration)
+    def __init__(self, prefecture='Tokyo', population=1e7):
+        super().__init__(prefecture=prefecture, population=population)
         self.params = params.SeirPde()
 
     def pde(self, u, t, A, dx, beta, epsilon, rho):
@@ -228,7 +232,7 @@ class SeirPde(SeirOde):
         n, D, L, beta, epsilon, rho, _, e0, i0, _ = theta
         x = np.linspace(0, L, n+1) # mesh points in space
         dx = x[1] - x[0] # spatial resolution
-        A = self.gen_operator(n)
+        A = self.gen_operator(n, D)
         args = (A, dx, beta, epsilon, rho)
         
         # Set initial conditions
@@ -239,16 +243,18 @@ class SeirPde(SeirOde):
         r0 = np.zeros(n+1)
 
         u0 = [s0, e0, i0, r0]
-        u_list = odeintw(self.pde, u0, args=args)
+        u_list = odeintw(self.pde, u0, t, args=args)
         s, e, i, r = u_list[:, 0], u_list[:, 1], u_list[:, 2], u_list[:, 3]
         return [s, e, i, r]
 
-    def gen_operator(self, n):
+    def gen_operator(self, n, D):
         """ Returns operator for calculating diffusion term. 
 
         Parameters
         ----------
         n : int
+        D : float
+            diffusion coefficient
 
         Return
         ----------

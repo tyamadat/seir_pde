@@ -78,7 +78,7 @@ data = iodata.load_data(args.path, args.prefecture, args.metrics, (args.first_da
 
 # Define t
 duration = args.last_day - args.first_day
-t = np.linspace(0, duration, duration*args.ode_step+1)
+t = np.linspace(0, duration, duration*args.ode_step + 1)
 
 # Define model
 if args.model == 'SEIR_ODE':
