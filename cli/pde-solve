@@ -41,6 +41,10 @@ parser.add_argument('-d', '--discard', type=int, default=0,
                     help='Discard the first "discard" steps in the chain as burn-in.')
 parser.add_argument('-tn', '--thin', type=int, default=1, 
                     help='Use only every "thin" steps from the chain')
+parser.add_argument('-p', '--parameter', type=str, 
+                    help='How to choose parameter sets. sampler (median/mean/mode) or parameters (given)')
+parser.add_argument('-prp', '--parameter-path', type=str, default=None, 
+                    help='The path to the sampler or parameters.')
 parser.add_argument('-pm', '--parameter-method', type=str, default='median', 
                     help='How to determine the representative parameter set from \
                           MCMC sampler. median / mean')
@@ -50,7 +54,7 @@ parser.add_argument('-ld', '--last-day', type=int, default=50,
                     help='The last day from which modeling is going to be conducted.')
 parser.add_argument('-os', '--ode-step', type=int, default=1000, 
                     help='The resolution of a solution of ODEs.')
-parser.add_argument('-pp', '--population-path', type=str, default='../data/population.csv', 
+parser.add_argument('-ppp', '--population-path', type=str, default='../data/population.csv', 
                     help='The path to the population data for each prefecture.')
 
 # Pull the arguments
@@ -68,23 +72,33 @@ model = models.SeirPde(
 )
 
 # Load sampler and extract representative parameters
-filename = f'{args.prefecture}.pickle'
-with open(os.path.join(args.sampler_path, args.title, filename), 'rb') as f:
-    sampler = pickle.load(f)
-flat_samples = sampler.get_chain(discard=args.discard, thin=args.thin, flat=True)
-beta, epsilon, rho, xi, e0, i0, tau = getattr(np, args.parameter_method)(flat_samples, axis=0)
+if args.parameter == 'parameters':
+    with open(args.parameter_path, 'rb') as f:
+        parameters = pickle.load(f) # beta, epsilon, rho, xi, e0, i0, tau
+
+elif args.parameter == 'sampler':
+    if args.parameter_path is None:
+        filename = f'{args.prefecture}.pickle'
+        param_path = os.path.join(args.sampler_path, args.title, filename)
+    else:
+        param_path = args.parameter_path
+    with open(param_path, 'rb') as f:
+        sampler = pickle.load(f)
+    flat_samples = sampler.get_chain(discard=args.discard, thin=args.thin, flat=True)
+    parameters = getattr(np, args.parameter_method)(flat_samples, axis=0)
+
 n = args.npoints
 D = args.diffusion_coefficient
 L = args.length
-theta = [n, D, L, beta, epsilon, rho, xi, e0, i0, tau]
+diffusion_parameters = np.array([n, D, L])
+theta = np.append(diffusion_parameters, parameters)
 
 # Solve PDE
 sol = model.solve(theta, t)
-sol = sol[0:duration:args.ode_step, :, :] # subsampling to save storage
 
 # Save solutions
 save_file = f'day{args.first_day}-{args.last_day}_n{n}_d{D}_l{L}'
 savedir = os.path.join(args.outputdir, f'{args.title}')
 subprocess.run(['mkdir', '-p', savedir])
 with open(os.path.join(savedir, f'{save_file}.pickle'), mode='wb') as f:
-    pickle.dump(sol, f)
+    pickle.dump(sol, f, protocol=4)

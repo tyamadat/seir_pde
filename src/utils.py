@@ -89,7 +89,7 @@ class PDE:
     """
     """
     def __init__(self):
-        pass
+        self.model = models.SeirPde()
 
     def fitting(self, sol, y_obs, xi, x_range, y_range, metrics='MSE'):
         """ Returns list of fitting values for each x (distance from epicenter).
@@ -109,12 +109,14 @@ class PDE:
         eval_arr : np.ndarray, shape=(x_range[1]-x_range[0], )
             List of fitting values for each x
         """
+        leny = y_obs.shape[0]
         y_obs = np.cumsum(y_obs[y_range[0]:y_range[1]])
 
         eval_list = []
         for x in range(x_range[0], x_range[1]):
             u_list = sol[:, :, x]
-            s, e, i, r = u_list[0], u_list[:, 1], u_list[:, 2], u_list[:, 3]
+            s, e, i, r = u_list[:, 0], u_list[:, 1], u_list[:, 2], u_list[:, 3]
+            s, e, i, r = self.model.downsampling(s.shape[0], leny, s, e, i, r)
             y_model = np.cumsum(xi*i)[y_range[0]:y_range[1]]
             eval_list.append(self.fit_eval(y_model, y_obs, metrics=metrics))
 
@@ -142,8 +144,10 @@ class PDE:
     def fit_plot(self, ax, sol, y_obs, xi, x, y_range):
         """
         """
+        leny = y_obs.shape[0]
         u_list = sol[:, :, x]
-        s, e, i, r = u_list[0], u_list[:, 1], u_list[:, 2], u_list[:, 3]
+        s, e, i, r = u_list[:, 0], u_list[:, 1], u_list[:, 2], u_list[:, 3]
+        s, e, i, r = self.model.downsampling(s.shape[0], leny, s, e, i, r)
 
         x = np.arange(y_range[1]-y_range[0])
         y_obs = np.cumsum(y_obs[y_range[0]:y_range[1]])

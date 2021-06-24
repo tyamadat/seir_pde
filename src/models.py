@@ -184,7 +184,7 @@ class SeirPde(SeirOde):
     """
     def __init__(self, prefecture='Tokyo', population=1e7):
         super().__init__(prefecture=prefecture, population=population)
-        self.params = params.SeirPde()
+        self.params = params.SeirPde(population=population)
 
     def pde(self, u, t, A, dx, beta, epsilon, rho):
         """ Describe PDE as a set of ODEs by a central difference approximation in space. \
@@ -232,6 +232,7 @@ class SeirPde(SeirOde):
             solution for the PDEs
         """
         n, D, L, beta, epsilon, rho, _, e0, i0, _ = theta
+        n = int(n)
         x = np.linspace(0, L, n+1) # mesh points in space
         dx = x[1] - x[0] # spatial resolution
         A = self.gen_operator(n, D)

@@ -28,7 +28,7 @@ parser = argparse.ArgumentParser(description=desc)
 parser.add_argument('-t', '--title', type=str, default='', 
                     help='The description of the mcmc experiment. This is going to be \
                           the name of directory to be saved.')
-parser.add_argument('-p', '--path', type=str, default='../data/20mar_21may.csv', 
+parser.add_argument('-dp', '--data-path', type=str, default='../data/20mar_21may.csv', 
                     help='The path to the data. This path is going to be the argument \
                           for io.load_data().')
 parser.add_argument('-o', '--outputdir', type=str, default='../results/pde_analysis', 
@@ -48,6 +48,10 @@ parser.add_argument('-d', '--discard', type=int, default=0,
                     help='Discard the first "discard" steps in the chain as burn-in.')
 parser.add_argument('-tn', '--thin', type=int, default=1, 
                     help='Use only every "thin" steps from the chain')
+parser.add_argument('-p', '--parameter', type=str, 
+                    help='How to choose parameter sets. sampler (median/mean/mode) or parameters (given)')
+parser.add_argument('-prp', '--parameter-path', type=str, default=None, 
+                    help='The path to the sampler or parameters.')
 parser.add_argument('-pm', '--parameter-method', type=str, default='median', 
                     help='How to determine the representative parameter set from \
                           MCMC sampler. median / mean')
@@ -55,6 +59,10 @@ parser.add_argument('-fd', '--first-day', type=int, default=0,
                     help='The first day from which modeling is going to be conducted.')
 parser.add_argument('-ld', '--last-day', type=int, default=50, 
                     help='The last day from which modeling is going to be conducted.')
+parser.add_argument('-fdf', '--first-day-fitting', type=int, default=None, 
+                    help='The first day from which fitting is going to be conducted.')
+parser.add_argument('-ldf', '--last-day-fitting', type=int, default=None, 
+                    help='The last day from which fitting is going to be conducted.')
 parser.add_argument('-xm', '--xmax', type=int, default=1000, 
                     help='The max value of x to be the fitting will be conducted (0~x-1)')
 parser.add_argument('-os', '--ode-step', type=int, default=1000, 
@@ -64,22 +72,36 @@ parser.add_argument('-os', '--ode-step', type=int, default=1000,
 args = parser.parse_args()
 
 # Load data
-data = iodata.load_data(args.path, args.prefecture, args.metrics, (args.first_day, args.last_day))
+data = iodata.load_data(args.data_path, args.prefecture, args.metrics, (args.first_day, args.last_day))
 
 # Load solution
 with open(os.path.join(args.sol_path, args.title, f'{args.sol_file}.pickle'), 'rb') as f:
     sol = pickle.load(f)
 
 # Load sampler and set parameters
-filename = 'Tokyo.pickle'
-with open(os.path.join(args.sampler_path, args.title, filename), 'rb') as f:
-    sampler = pickle.load(f)
-flat_samples = sampler.get_chain(discard=args.discard, thin=args.thin, flat=True)
-beta, epsilon, rho, xi, e0, i0, tau = getattr(np, args.parameter_method)(flat_samples, axis=0)
+if args.parameter == 'parameters':
+    with open(args.parameter_path, 'rb') as f:
+        parameters = pickle.load(f)
+    beta, epsilon, rho, xi, e0, i0, tau = parameters
+
+elif args.parameter == 'sampler':
+    if args.parameter_path is None:
+        filename = f'{args.prefecture}.pickle'
+        param_path = os.path.join(args.sampler_path, args.title, filename)
+    else:
+        param_path = args.parameter_path
+    with open(param_path, 'rb') as f:
+        sampler = pickle.load(f)
+    flat_samples = sampler.get_chain(discard=args.discard, thin=args.thin, flat=True)
+    beta, epsilon, rho, xi, e0, i0, tau = getattr(np, args.parameter_method)(flat_samples, axis=0)
 
 # Define t
 duration = args.last_day - args.first_day
 t = np.linspace(0, duration, duration*args.ode_step + 1)
+
+# Define fitting period
+ini = args.first_day_fitting - args.first_day
+ter = args.last_day_fitting - args.first_day
 
 # Fitting
 metrics_list = [
@@ -89,23 +111,23 @@ metrics_list = [
 fitting_res = pd.Series(dtype=object)
 fitting_res['Prefecture'] = args.prefecture
 for metrics in metrics_list:
-    eval_arr = utils.PDE().fitting(sol, data, xi, (0, args.xmax), (0, duration), metrics)
+    eval_arr = utils.PDE().fitting(sol, data, xi, (0, args.xmax), (ini, ter), metrics)
     fitting_res[f'{metrics}_minx'] = np.argmin(eval_arr)
     fitting_res[f'{metrics}_min'] = np.min(eval_arr)
     
 # Save fitting results
 savefile = f'{args.sol_file}_{args.prefecture}.pickle'
-savedir = os.path.join(args.outputdir, args.title, 'distance')
+savedir = os.path.join(args.outputdir, f'{args.title}_{args.first_day_fitting}-{args.last_day_fitting}', 'distance')
 subprocess.run(['mkdir', '-p', savedir])
 with open(os.path.join(savedir, savefile), 'wb') as f:
     pickle.dump(fitting_res, f)
 
 # Plot fitting results
 savefile = f'{args.sol_file}_{args.prefecture}.png'
-savedir = os.path.join(args.outputdir, args.title, 'plot')
+savedir = os.path.join(args.outputdir, f'{args.title}_{args.first_day_fitting}-{args.last_day_fitting}', 'plot')
 subprocess.run(['mkdir', '-p', savedir])
 fig, ax = plt.subplots(1, 1, figsize=(12, 6))
-ax = utils.PDE().fit_plot(ax, sol, data, xi, fitting_res['RMSE_minx'], (0, duration))
+ax = utils.PDE().fit_plot(ax, sol, data, xi, fitting_res['RMSE_minx'], (ini, ter))
 plt.savefig(os.path.join(savedir, savefile), format='png')
 plt.clf()
 plt.close()
