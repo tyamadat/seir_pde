@@ -4,9 +4,7 @@ import os
 import sys
 import argparse
 import subprocess
-import datetime
 sys.path.append('../src')
-today = str(datetime.date.today())
 
 import numpy as np
 import pickle
@@ -82,10 +80,11 @@ theta = [n, D, L, beta, epsilon, rho, xi, e0, i0, tau]
 
 # Solve PDE
 sol = model.solve(theta, t)
+sol = sol[0:duration:args.ode_step, :, :] # subsampling to save storage
 
 # Save solutions
-savefile = f'day{args.first_day}-{args.last_day}_n{n}_d{D}_l{L}'
-savedir = os.path.join(args.outputdir, f'{today}_{args.title}')
+save_file = f'day{args.first_day}-{args.last_day}_n{n}_d{D}_l{L}'
+savedir = os.path.join(args.outputdir, f'{args.title}')
 subprocess.run(['mkdir', '-p', savedir])
 with open(os.path.join(savedir, f'{save_file}.pickle'), mode='wb') as f:
     pickle.dump(sol, f)

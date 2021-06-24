@@ -129,13 +129,30 @@ class Fitting:
 
     def estimate(self, theta, t):
         xi = theta[3]
-        s, e, i, r = self.model.solve_ode(theta, t)
-        s, e, i, r = self.model.downsampling(t, self.data, s, e, i, r)
+        s, e, i, r = self.model.solve(theta, t)
+        s, e, i, r = self.model.downsampling(t.shape[0], self.data.shape[0], s, e, i, r)
         return xi * i
     
     def plot_median(self, ax, t):
         median = np.median(self.flat_samples, axis=0)
         est = self.estimate(median, t)
+        ax.plot(self.x, est, color='dodgerblue')
+        return ax
+
+    def plot_mean(self, ax, t):
+        mean = np.mean(self.flat_samples, axis=0)
+        est = self.estimate(mean, t)
+        ax.plot(self.x, est, color='dodgerblue')
+        return ax
+
+    def plot_mode(self, ax, t, bins=10):
+        mode_list = []
+        for i in range(self.flat_samples.shape[1]):
+            param = self.flat_samples[:, i]
+            hist, mode = np.histogram(param, bins=bins)
+            mode_list.append(mode[np.argmax(hist)])
+        mode_arr = np.array(mode_list)
+        est = self.estimate(mode_arr, t)
         ax.plot(self.x, est, color='dodgerblue')
         return ax
 

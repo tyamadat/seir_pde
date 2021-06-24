@@ -6,9 +6,9 @@
 """
 
 import os
-os.environ["OPENBLAS_NUM_THREADS"] = '1'
-os.environ["MKL_NUM_THREADS"] = '1'
-os.environ["VECLIB_NUM_THREADS"] = '1'
+os.environ["OPENBLAS_NUM_THREADS"] = '10'
+os.environ["MKL_NUM_THREADS"] = '10'
+os.environ["VECLIB_NUM_THREADS"] = '10'
 
 import numpy as np
 from scipy.integrate import odeint
@@ -93,20 +93,22 @@ class SeirOde:
         s, e, i, r = u_list[:, 0], u_list[:, 1], u_list[:, 2], u_list[:, 3]
         return [s, e, i, r]
 
-    def downsampling(self, t, y, s, e, i, r):
+    def downsampling(self, lent, leny, s, e, i, r):
         """ Returns downsampled ODE results that match observed data. 
 
         Parameters
         ----------
-        t : np.ndarray
-        y : np.ndarray
+        lent : float
+            length of array t
+        leny : float
+            length of array y
 
         Return
         ----------
         downsampled solution : List[np.ndarray]
         """
-        step = len(t) // len(y)
-        if len(t) % len(y) == 0:
+        step = lent // leny
+        if lent % leny == 0:
             return [s[::step], e[::step], i[::step], r[::step]]
         else:  # x[::step] becomes len(y)+1 -> remove the final element in the array
             return [s[::step][:-1], e[::step][:-1], i[::step][:-1], r[::step][:-1]]
@@ -150,7 +152,7 @@ class SeirOde:
         log likelihood : np.float
         """
         s, e, i, r = self.solve(theta, t)
-        s, e, i, r = self.downsampling(t, y, s, e, i, r)
+        s, e, i, r = self.downsampling(t.shape[0], y.shape[0], s, e, i, r)
         xi = theta[n_beta:][2]
         tau = theta[n_beta:][5]
         # y_model = getattr(self.calib, self.model)(self.calib, [s, e, i, r], xi)
@@ -178,7 +180,7 @@ class SeirOde:
 
 
 class SeirPde(SeirOde):
-    """ Diffusion model from Tokyo (described by ODE) described by PDE. 
+    """ Diffusion model from Tokyo (described by ODE) described by PDE.
     """
     def __init__(self, prefecture='Tokyo', population=1e7):
         super().__init__(prefecture=prefecture, population=population)
@@ -226,7 +228,7 @@ class SeirPde(SeirOde):
 
         Return
         ----------
-        u : List[np.ndarray]
+        u_arr : np.ndarray, shape=(len(t), 4, len(x))
             solution for the PDEs
         """
         n, D, L, beta, epsilon, rho, _, e0, i0, _ = theta
@@ -243,9 +245,8 @@ class SeirPde(SeirOde):
         r0 = np.zeros(n+1)
 
         u0 = [s0, e0, i0, r0]
-        u_list = odeintw(self.pde, u0, t, args=args)
-        s, e, i, r = u_list[:, 0], u_list[:, 1], u_list[:, 2], u_list[:, 3]
-        return [s, e, i, r]
+        u_arr = odeintw(self.pde, u0, t, args=args)
+        return u_arr
 
     def gen_operator(self, n, D):
         """ Returns operator for calculating diffusion term. 
@@ -344,20 +345,3 @@ class GraphDiff(SeirOde):
         u_list = odeintw(self.ode, u0, t, args=args)
         s, e, i, r = u_list[:, 0], u_list[:, 1], u_list[:, 2], u_list[:, 3]
         return [s, e, i, r]
-
-    def downsampling(self, t, y, s, e, i, r):
-        """
-        Parameters
-        ----------
-        t : np.ndarray
-        y : np.ndarray, shape=(n_days, n_pref)
-
-        Return
-        ----------
-        downsampled solution : List[np.ndarray]
-        """
-        step = t.shape[0] // y.shape[0]
-        if len(t) % len(y[:, 0]) == 0:
-            return [s[::step], e[::step], i[::step], r[::step]]
-        else:  # x[::step] becomes len(y)+1 -> remove the final element in the array
-            return [s[::step][:-1], e[::step][:-1], i[::step][:-1], r[::step][:-1]]

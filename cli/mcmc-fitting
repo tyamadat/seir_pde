@@ -51,6 +51,9 @@ parser.add_argument('-d', '--discard', type=int, default=0,
                     help='Discard the first "discard" steps in the chain as burn-in.')
 parser.add_argument('-tn', '--thin', type=int, default=1, 
                     help='Use only every "thin" steps from the chain')
+parser.add_argument('-pm', '--parameter-method', type=str, default='median', 
+                    help='How to determine the representative parameter set from \
+                          MCMC sampler. median / mean')
 parser.add_argument('-pp', '--population-path', type=str, default='../data/population.csv', 
                     help='The path to the population data for each prefecture.')
 parser.add_argument('-f', '--format', type=str, default='png', 
@@ -94,7 +97,7 @@ fitting_dir = os.path.join(savedir, 'fitting')
 subprocess.run(['mkdir', '-p', fitting_dir])
 fig, ax = plt.subplots(1, 1, figsize=(12, 8))
 ax = fitting.plot_data(ax)
-ax = fitting.plot_median(ax, t)
+ax = getattr(fitting, f'plot_{args.parameter_method}')(ax, t)
 # ax = fitting.plot_credible_interval(ax, t)
 plt.savefig(os.path.join(fitting_dir, f'{args.prefecture}.{args.format}'), format=args.format)
 plt.clf()

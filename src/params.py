@@ -27,7 +27,7 @@ class SeirOde:
         self.ini = np.array([
             8.0e-8, # beta
             1.0e-1, # epsilon
-            1.0e-1,    # rho
+            1.0e-1, # rho
             1.0,    # xi
             3.8e-5*self.population, # e0
             3.8e-5*self.population, # i0
@@ -37,16 +37,16 @@ class SeirOde:
             (1e-10, 1e-5), # beta
             (1e-2, 1.),    # epsilon
             (1e-2, 1.),    # rho
-            (1e-3, 1e1), # xi
-            (1e1, 1e4),      # e0
-            (1e1, 1e4),      # i0
+            (1e-3, 1e1),   # xi
+            (1e1, 1e4),    # e0
+            (1e1, 1e4),    # i0
             (1e-8, 1e2),   # tau
         ]
         self.random_exponent = np.array([
             1e-12, # beta
             1e-4,  # epsilon
             1e-4,  # rho
-            1e-5, # xi
+            1e-5,  # xi
             1e-1,  # e0
             1e-1,  # i0
             1e-10, # tau
