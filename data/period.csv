@@ -1,9 +1,4 @@
-first_wave,0,60
-second_wave,60,200
-third_wave,200,360
-first_wave_before,0,27
-first_wave_after,27,60
-second_wave_before,60,140
-second_wave_after,140,200
-third_wave_before,200,299
-third_wave_after,299,360
+first_wave,0,84
+second_wave,84,220
+third_wave,220,360
+forth_wave,360,465

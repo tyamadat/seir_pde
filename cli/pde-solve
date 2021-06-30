@@ -52,6 +52,10 @@ parser.add_argument('-fd', '--first-day', type=int, default=0,
                     help='The first day from which modeling is going to be conducted.')
 parser.add_argument('-ld', '--last-day', type=int, default=50, 
                     help='The last day from which modeling is going to be conducted.')
+parser.add_argument('-fdf', '--first-day-fitting', type=int, default=None, 
+                    help='The first day from which fitting is going to be conducted.')
+parser.add_argument('-ldf', '--last-day-fitting', type=int, default=None, 
+                    help='The last day from which fitting is going to be conducted.')
 parser.add_argument('-os', '--ode-step', type=int, default=1000, 
                     help='The resolution of a solution of ODEs.')
 parser.add_argument('-ppp', '--population-path', type=str, default='../data/population.csv', 
@@ -62,7 +66,12 @@ args = parser.parse_args()
 
 # Define t (mesh points in time)
 duration = args.last_day - args.first_day
-t = np.linspace(0, duration, duration*args.ode_step + 1)
+t = np.linspace(0, duration, duration*args.ode_step+1)
+
+# Define fitting period
+ini = args.first_day_fitting - args.first_day
+ter = args.last_day_fitting - args.first_day
+t2 = np.linspace(ini, ter, (ter-ini)*args.ode_step+1)
 
 # Define model
 population = iodata.load_population(args.population_path, args.prefecture)
@@ -94,10 +103,13 @@ diffusion_parameters = np.array([n, D, L])
 theta = np.append(diffusion_parameters, parameters)
 
 # Solve PDE
-sol = model.solve(theta, t)
+sol = model.solve(theta, t, t2, args.ode_step)
+print(sol.shape)
+# sol = sol[ini*args.ode_step:ter*args.ode_step, :, :]
+# print(sol.shape)
 
 # Save solutions
-save_file = f'day{args.first_day}-{args.last_day}_n{n}_d{D}_l{L}'
+save_file = f'day{args.first_day_fitting}-{args.last_day_fitting}_n{n}_d{D}_l{L}'
 savedir = os.path.join(args.outputdir, f'{args.title}')
 subprocess.run(['mkdir', '-p', savedir])
 with open(os.path.join(savedir, f'{save_file}.pickle'), mode='wb') as f:

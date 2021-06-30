@@ -25,30 +25,31 @@ class SeirOde:
     
     def set_nc(self):
         self.ini = np.array([
-            8.0e-8, # beta
-            1.0e-1, # epsilon
-            1.0e-1, # rho
-            1.0,    # xi
-            3.8e-5*self.population, # e0
-            3.8e-5*self.population, # i0
-            2.0e-5, # tau
+            2.7e-7, # beta
+            7.0e-2, # epsilon
+            6.2e-1, # rho
+            4.0e-3,    # xi
+            1.2e-4*self.population, # e0
+            2.9e-4*self.population, # i0
+            2.61e-5, # tau
         ])
         self.uniform_range = [
-            (1e-10, 1e-5), # beta
+            (1e-9, 1e-6), # beta
             (1e-2, 1.),    # epsilon
-            (1e-2, 1.),    # rho
-            (1e-3, 1e1),   # xi
-            (1e1, 1e4),    # e0
-            (1e1, 1e4),    # i0
+            (5e-2, 5.),    # rho
+            (1e-5, 1e-1),   # xi
+            (1e2, 1e4),    # e0
+            (1e2, 1e4),    # i0
+            (1e2, 1e4),    # i0
             (1e-8, 1e2),   # tau
         ]
         self.random_exponent = np.array([
-            1e-12, # beta
+            1e-11, # beta
             1e-4,  # epsilon
-            1e-4,  # rho
-            1e-5,  # xi
-            1e-1,  # e0
-            1e-1,  # i0
+            5e-4,  # rho
+            1e-7,  # xi
+            1e1,  # e0
+            1e1,  # i0
             1e-10, # tau
         ])
     

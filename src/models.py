@@ -216,7 +216,7 @@ class SeirPde(SeirOde):
         
         return [dsdt, dedt, didt, drdt]
 
-    def solve(self, theta, t):
+    def solve(self, theta, t, t2=None, ode_step=None):
         """ Returns PDE solutions. 
 
         Parameters
@@ -247,7 +247,16 @@ class SeirPde(SeirOde):
 
         u0 = [s0, e0, i0, r0]
         u_arr = odeintw(self.pde, u0, t, args=args)
-        return u_arr
+        if t2 is None or t2[0]==0:
+            return u_arr
+        else:
+            s0 = np.append(u_arr[int(t2[0]*ode_step), 0, 0], np.zeros(n))
+            e0 = np.append(u_arr[int(t2[0]*ode_step), 1, 0], np.zeros(n))
+            i0 = np.append(u_arr[int(t2[0]*ode_step), 2, 0], np.zeros(n))
+            r0 = np.append(u_arr[int(t2[0]*ode_step), 3, 0], np.zeros(n))
+            u0 = [s0, e0, i0, r0]
+            u_arr = odeintw(self.pde, u0, t2-t2[0], args=args)
+            return u_arr
 
     def gen_operator(self, n, D):
         """ Returns operator for calculating diffusion term. 

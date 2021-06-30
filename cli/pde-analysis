@@ -96,12 +96,13 @@ elif args.parameter == 'sampler':
     beta, epsilon, rho, xi, e0, i0, tau = getattr(np, args.parameter_method)(flat_samples, axis=0)
 
 # Define t
-duration = args.last_day - args.first_day
-t = np.linspace(0, duration, duration*args.ode_step + 1)
+# duration = args.last_day - args.first_day
+# t = np.linspace(0, duration, duration*args.ode_step + 1)
 
 # Define fitting period
 ini = args.first_day_fitting - args.first_day
 ter = args.last_day_fitting - args.first_day
+# duration = args.last_day_fitting - args.first_day_fitting
 
 # Fitting
 metrics_list = [

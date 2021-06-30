@@ -117,7 +117,7 @@ class PDE:
             u_list = sol[:, :, x]
             s, e, i, r = u_list[:, 0], u_list[:, 1], u_list[:, 2], u_list[:, 3]
             s, e, i, r = self.model.downsampling(s.shape[0], leny, s, e, i, r)
-            y_model = np.cumsum(xi*i)[y_range[0]:y_range[1]]
+            y_model = np.cumsum(xi*i)[y_range[0]-y_range[0]:y_range[1]-y_range[0]]
             eval_list.append(self.fit_eval(y_model, y_obs, metrics=metrics))
 
         return np.array(eval_list)
@@ -149,9 +149,9 @@ class PDE:
         s, e, i, r = u_list[:, 0], u_list[:, 1], u_list[:, 2], u_list[:, 3]
         s, e, i, r = self.model.downsampling(s.shape[0], leny, s, e, i, r)
 
-        x = np.arange(y_range[1]-y_range[0])
+        x = np.arange(y_range[0]-y_range[0], y_range[1]-y_range[0])
         y_obs = np.cumsum(y_obs[y_range[0]:y_range[1]])
-        y_model = np.cumsum(xi*i)[y_range[0]:y_range[1]]
+        y_model = np.cumsum(xi*i)[y_range[0]-y_range[0]:y_range[1]-y_range[0]]
         ax.plot(x, y_obs)
         ax.plot(x, y_model)
         return ax
