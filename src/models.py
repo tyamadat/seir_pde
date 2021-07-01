@@ -15,6 +15,7 @@ from scipy.integrate import odeint
 from scipy.sparse import dia_matrix, identity
 from odeintw import odeintw
 import networkx as nx
+from tqdm import tqdm
 
 import utils
 import params
@@ -279,6 +280,80 @@ class SeirPde(SeirOde):
         E = identity(n+1)
         A = E + D*B
         return A
+
+
+class SeirPdeSimulation(SeirPde):
+    def __init__(self, prefecture='Tokyo', population=1e7):
+        super().__init__(prefecture=prefecture, population=population)
+        self.params = params.SeirPde(population=population)
+    
+    def pde_euler(self, i0, i_boundary, t, A, dx):
+        """ Describe PDE as a set of ODEs by a central difference approximation in space. \
+        Initial condition: u[0, 0]=u[0], u[x, 0]=0 (x!=0) \
+        Boundary condition: Neumann boundary condition
+
+        Parameters
+        ----------
+        i0 : np.ndarray, shape=(n,)
+        i_boundary : np.ndarray, shape=(lent,)
+        A : scipy.sparse
+            operator for calculating diffusion term
+        dx : float
+            spatial resolution. 
+
+        Return
+        ----------
+        i : np.ndarray, shape=(n, lent)
+        """
+        dt = t[1] - t[0]
+        lent = len(t)
+        i = np.array([i0])
+
+        for j in tqdm(range(lent-1)):
+            i[-1, 0] = i_boundary[j]
+            it = i[-1, :]
+            didt = A.dot(it) / dx**2 * dt
+            i = np.vstack([i, it+didt])
+        return i
+
+    def solve(self, theta, t, t2=None, cf=1., ode_step=None):
+        """ Returns PDE solutions. 
+
+        Parameters
+        ----------
+        theta : np.ndarray, shape=(nparam)
+            n : number of points in space
+            D : diffusion coefficient
+            L : upper limit of space (lower limit: 0)
+        cf : float
+            coefficient for simulation
+
+        Return
+        ----------
+        u_arr : np.ndarray, shape=(len(t), 4, len(x))
+            solution for the PDEs
+        """
+        n, D, L, beta, epsilon, rho, _, e0, i0, _ = theta
+        n = int(n)
+        x = np.linspace(0, L, n+1) # mesh points in space
+        dx = x[1] - x[0] # spatial resolution
+        A = self.gen_operator(n, D)
+        args = (A, dx)
+
+        # Calculate boundary condition (x=0)
+        _, _, i_boundary, _ = SeirOde(population=self.params.population).solve(theta[3:], t)
+        i_boundary = i_boundary * 10**cf
+
+        # Set initial conditions
+        i0 = np.append(i0, np.zeros(n))
+        i = self.pde_euler(i0, i_boundary, t, A, dx)
+
+        if t2 is None or t2[0]==0:
+            return i
+        else:
+            i0 = np.append(i[int(t2[0]*ode_step), 0], np.zeros(n))
+            i = self.pde_euler(i0, i_boundary[t2[0]:t2[-1]], t2-t2[0], A, dx)
+            return i
 
 
 class GraphDiff(SeirOde):

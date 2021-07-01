@@ -115,7 +115,7 @@ for metrics in metrics_list:
     eval_arr = utils.PDE().fitting(sol, data, xi, (0, args.xmax), (ini, ter), metrics)
     fitting_res[f'{metrics}_minx'] = np.argmin(eval_arr)
     fitting_res[f'{metrics}_min'] = np.min(eval_arr)
-    
+
 # Save fitting results
 savefile = f'{args.sol_file}_{args.prefecture}.pickle'
 savedir = os.path.join(args.outputdir, f'{args.title}_{args.first_day_fitting}-{args.last_day_fitting}', 'distance')
