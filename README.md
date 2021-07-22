@@ -28,6 +28,8 @@ Run Markov chain Monte Carlo (MCMC) using affine invariant methods to estimate p
 - `cartogram.py`\
 Distort a map based on the effective distance from a reference point (e.g., Tokyo) and local connectivity such as geographical distance between nearby prefectures. 
 
+![cartogram](images/cartogram.png)
+
 ### `cli`
 You can use command line interface to run source codes in `src`. 
 
@@ -43,5 +45,3 @@ The survey data of passenger traffic between prefectures in 2019, provided by Mi
 Population in each prefecture, provided by Statistics Bureau of Japan. 
 - `prefectures.csv`:\
 Infection status by prefecture, provided by [Toyo Keizai Inc](https://toyokeizai.net/sp/visual/tko/covid19/en.html). 
-
-## 
