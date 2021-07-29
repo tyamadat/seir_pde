@@ -1,0 +1,153 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import argparse
+import subprocess
+import datetime
+sys.path.append('../src')
+today = str(datetime.date.today())
+
+import numpy as np
+import pickle
+from typing import Tuple
+
+import iodata
+import utils
+import models
+from mcmc import MCMC
+
+
+if __name__ != '__main__':
+    sys.exit()
+
+desc = """ 
+       """
+
+# Describe the arguments into the program. 
+parser = argparse.ArgumentParser(description=desc)
+parser.add_argument('-m', '--model', type=str, 
+                    help='The name of a model to be used.')
+parser.add_argument('-t', '--title', type=str, default='', 
+                    help='The description of the mcmc experiment. This is going to be \
+                          the name of directory to be saved.')
+parser.add_argument('-p', '--path', type=str, default='../data/20mar_21may.csv', 
+                    help='The path to the data. This path is going to be the argument \
+                          for io.load_data().')
+parser.add_argument('-o', '--outputdir', type=str, default='../results/sampler', 
+                    help='The path to the directory where results are saved.')
+parser.add_argument('-pf', '--prefecture', type=str, default='Tokyo', 
+                    help='The prefecture for which modeling is going to be conducted.')
+parser.add_argument('-cl', '--calibration', type=str, default='NC',
+                    help='How to calibrate the model to the observed data.')
+parser.add_argument('-ct', '--connectivity-type', type=str, default='Adjuscent', 
+                    help='The type of connectivity to be considered when constructing \
+                          a network of prefectures.')
+parser.add_argument('-nri', '--network-range-ini', type=int, default=None, 
+                    help='The initial value of prefecture indexes to be considered. e.g., \
+                          Kanto region: (8, 14) (8, 9, 10, 11, 12, 13, 14). \
+                          Warning: adjusted to pd.DataFrame.loc[]!')
+parser.add_argument('-nrt', '--network-range-ter', type=int, default=None, 
+                    help='The terminal value of prefecture indexes to be considered. e.g., \
+                          Kanto region: (8, 14) (8, 9, 10, 11, 12, 13, 14). \
+                          Warning: adjusted to pd.DataFrame.loc[]!')               
+parser.add_argument('-ms', '--metrics', type=str, default='aveNewTestedPositive', 
+                    help='The metrics for which modeling is going to be conducted.')
+parser.add_argument('-fd', '--first-day', type=int, default=0, 
+                    help='The first day from which modeling is going to be conducted.')
+parser.add_argument('-ld', '--last-day', type=int, default=50, 
+                    help='The last day from which modeling is going to be conducted.')
+parser.add_argument('-os', '--ode-step', type=int, default=1000, 
+                    help='The resolution of a solution of ODEs.')
+parser.add_argument('-w', '--walkers', type=int, default=32, 
+                    help='The number of walkers in the ensemble in MCMC.')
+parser.add_argument('-s', '--step', type=int, default=500000, 
+                    help='The number of steps to run in MCMC.')
+parser.add_argument('-pp', '--population-path', type=str, default='../data/population.csv', 
+                    help='The path to the population data for each prefecture.')
+parser.add_argument('-np', '--network-path', type=str, default='../data/prefecture_network.csv', 
+                    help='The path to the csv which contains prefectures and their connectivity.')
+parser.add_argument('-pr', '--process', type=int, default=1, 
+                    help='The number of processes (CPU cores) to run.')            
+
+# Pull the arguments
+args = parser.parse_args()
+
+# Load data
+data = iodata.load_data(args.path, args.prefecture, args.metrics, (args.first_day, args.last_day))
+
+# Define t
+duration = args.last_day - args.first_day
+t = np.linspace(0, duration, duration*args.ode_step + 1)
+
+# Define model
+if args.model == 'SEIR_ODE':
+    # Save file name = prefecture name
+    save_file = args.prefecture
+
+    # Load data
+    data = iodata.load_data(args.path, args.prefecture, args.metrics, (args.first_day, args.last_day))
+    population = iodata.load_population(args.population_path, args.prefecture)
+
+    # Specify method to disperse initial parameter values for a single prefecture
+    disperse_method = 'simple'
+
+    model = models.SeirOde(
+        prefecture=args.prefecture, 
+        population=population, 
+        calibration=args.calibration, 
+)
+elif args.model == 'GRAPH_DIFFUSION':
+    network_range = (args.network_range_ini, args.network_range_ter)
+
+    # Save file name = network_range
+    save_file = f'Prefectures_{args.network_range_ini}-{args.network_range_ter}'
+
+    # Load data
+    data = iodata.load_data_matrix(args.path, network_range, args.metrics, (args.first_day, args.last_day))
+    pref_connect_df = iodata.load_prefecture_network(args.network_path)
+
+    if network_range is not None:
+        pref_connect_df = pref_connect_df.loc[network_range[0]:network_range[1], :]
+        arr_pop = iodata.load_population_arr(args.population_path, network_range)
+    else: # network_range is None
+        arr_pop = iodata.load_population_arr(args.population_path, (1, 47))
+
+    # Specify method to disperse initial parameter values for multiple prefectures
+    disperse_method = 'complex'
+
+    pn = utils.PrefectureNetwork()
+    pn.build(
+        pref_connect_df, 
+        c_type=args.connectivity_type
+    )
+    model = models.GraphDiff(
+        g=pn.g, 
+        arr_pop= arr_pop, 
+        calibration=args.calibration, 
+    )
+else:
+    raise ValueError('The model f"{args.model}" is not implemented.')
+
+mcmc = MCMC()
+mcmc.run_mcmc(
+    log_probability=model.log_probability, 
+    theta_ini=model.params.ini, 
+    random_exponent=model.params.random_exponent, 
+    nwalkers=args.walkers, 
+    ndim=model.params.ndim, 
+    nstep=args.step, 
+    prior_param_list=model.params.uniform_range, 
+    t=t, 
+    y=data, 
+    param_num=model.params.param_num, 
+    disperse_method=disperse_method, 
+    nprocess=args.process, 
+    progress=True, 
+)
+
+# Save sampler object
+savedir = os.path.join(args.outputdir, f'{today}_{args.title}')
+subprocess.run(['mkdir', '-p', savedir])
+with open(os.path.join(savedir, f'{save_file}.pickle'), mode='wb') as f:
+    pickle.dump(mcmc.sampler, f)

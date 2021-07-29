@@ -1,0 +1,96 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import argparse
+import subprocess
+sys.path.append('../src')
+
+import pickle
+import matplotlib.pyplot as plt
+
+import params
+from mcmc import Analysis
+
+if __name__ != '__main__':
+    sys.exit()
+
+desc = """ 
+       """
+
+# Describe the arguments into the program. 
+parser = argparse.ArgumentParser(description=desc)
+parser.add_argument('-m', '--model', type=str, 
+                    help='The name of a model to be used.')
+parser.add_argument('-t', '--title', type=str, 
+                    help='The description of the mcmc experiment. This is should be  \
+                          the same as used in the run-mcmc.')
+parser.add_argument('-pf', '--prefix', type=str, default=None, 
+                    help='The prefix (especially prefecture) of the .pickle file \
+                          to be analysed.')
+parser.add_argument('-p', '--path', type=str, default='../results/sampler', 
+                    help='The path to the directory where samplers in each experiment \
+                          is saved.')
+parser.add_argument('-o', '--outputdir', type=str, default='../results/sampler_analysis', 
+                    help='The path to the directory where results are saved.')
+parser.add_argument('-d', '--discard', type=int, default=0, 
+                    help='Discard the first "discard" steps in the chain as burn-in.')
+parser.add_argument('-tn', '--thin', type=int, default=1, 
+                    help='Use only every "thin" steps from the chain')
+parser.add_argument('-f', '--format', type=str, default='png', 
+                    help='The format of the output files.')
+parser.add_argument('-a', '--all', action='store_true', 
+                    help='Conduct all the analyses')
+parser.add_argument('-sc', '--scatter', action='store_true', 
+                    help='Plot scatter.')
+parser.add_argument('-cn', '--convergence', action='store_true', 
+                    help='Conduct the convergence analysis.')
+
+# Pull the arguments
+args = parser.parse_args()
+
+# Define model
+if args.model == 'SEIR_ODE':
+    param = params.SeirOde()
+    param_label = param.list
+elif args.model == 'GraphDiff':
+    param = params.GraphDiff()
+    param_label = []
+    for i, param_name in enumerate(param.list):
+        if param.param_num[i] > 1:
+            for j in range(1, param.param_num[i]+1):
+                param_label = param_label + [f'{param_name}{j}']
+        else:
+            param_label = param_label + [param_name]
+else:
+    raise ValueError('The model f"{args.model}" is not implemented.')
+
+# Load .pickle file and define Analysis object
+filename = f'{args.prefix}.pickle'
+with open(os.path.join(args.path, args.title, filename), 'rb') as f:
+    sampler = pickle.load(f)
+analysis = Analysis(sampler, discard=args.discard, thin=args.thin)
+
+# Save path
+savedir = os.path.join(args.outputdir, args.title)
+subprocess.run(['mkdir', '-p', savedir])
+
+# Scatter plot
+if args.all or args.scatter:
+    scatter_dir = os.path.join(savedir, 'scatter')
+    subprocess.run(['mkdir', '-p', scatter_dir])
+    fig = plt.figure(figsize=(16, 16))
+    fig = analysis.plot_scatter(fig, param_label)
+    plt.savefig(os.path.join(scatter_dir, f'{args.prefix}.{args.format}'), format=args.format)
+    plt.clf()
+    plt.close()
+
+# Convergence analysis
+if args.all or args.convergence:
+    convergence_dir = os.path.join(savedir, 'convergence')
+    subprocess.run(['mkdir', '-p', convergence_dir])
+    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+    ax = analysis.plot_convergence(ax)
+    plt.savefig(os.path.join(convergence_dir, f'{args.prefix}.{args.format}'), format=args.format)
+    plt.clf()
+    plt.close()
